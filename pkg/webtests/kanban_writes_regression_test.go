@@ -55,7 +55,10 @@ func TestKanbanWritesRegression(t *testing.T) {
 		e, err := setupTestEnv()
 		require.NoError(t, err)
 
-		res := kanbanReq(e, http.MethodPost, "/api/v1/tasks/1", userJWT(t, 1), `{"bucket_id":2}`)
+		// Move task 1 from bucket 1 to bucket 3 through the generic
+		// update endpoint — the exact call shape bots use. (Bucket 2 is
+		// at its limit of 3 in the fixtures, so it would 412.)
+		res := kanbanReq(e, http.MethodPost, "/api/v1/tasks/1", userJWT(t, 1), `{"bucket_id":3}`)
 		require.Equal(t, http.StatusOK, res.Code)
 
 		s := db.NewSession()
@@ -63,7 +66,7 @@ func TestKanbanWritesRegression(t *testing.T) {
 		db.AssertExists(t, "task_buckets", map[string]interface{}{
 			"task_id":         1,
 			"project_view_id": 4,
-			"bucket_id":       2,
+			"bucket_id":       3,
 		}, false)
 	})
 
@@ -100,9 +103,11 @@ func TestKanbanWritesRegression(t *testing.T) {
 
 		s := db.NewSession()
 		defer s.Close()
+		// Task 30 has two assignees in the fixtures (users 1 and 2); both
+		// must survive an update that does not send assignees.
 		count, err := s.Where("task_id = ?", 30).Count(&models.TaskAssginee{})
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), count, "assignee must survive an update that does not send assignees")
+		assert.Equal(t, int64(2), count, "assignees must survive an update that does not send assignees")
 	})
 
 	t.Run("explicit empty assignees list still clears assignees", func(t *testing.T) {
