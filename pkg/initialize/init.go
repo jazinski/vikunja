@@ -159,6 +159,7 @@ func FullInit() {
 		models.RegisterListeners()
 		migrationHandler.RegisterListeners()
 		ws.RegisterListeners()
+		ws.RegisterTaskListeners()
 		err := events.InitEvents()
 		if err != nil {
 			log.Fatal(err.Error())

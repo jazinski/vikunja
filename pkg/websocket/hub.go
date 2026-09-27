@@ -83,3 +83,25 @@ func (h *Hub) PublishForUser(userID int64, event string, data any) {
 		}
 	}
 }
+
+// SubscribedUserIDs returns the ids of all users with at least one connection
+// subscribed to the given event. Duplicates are removed; order is unspecified.
+func (h *Hub) SubscribedUserIDs(event string) []int64 {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	seen := make(map[int64]bool)
+	var userIDs []int64
+	for userID, conns := range h.connections {
+		for _, conn := range conns {
+			if conn.IsSubscribed(event) {
+				if !seen[userID] {
+					seen[userID] = true
+					userIDs = append(userIDs, userID)
+				}
+				break
+			}
+		}
+	}
+	return userIDs
+}

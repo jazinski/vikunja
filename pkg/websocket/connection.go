@@ -19,6 +19,9 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -261,7 +264,8 @@ func (c *Connection) WriteLoop(ctx context.Context, cancel context.CancelFunc) {
 	}
 }
 
-// validEvents is the set of event names clients are allowed to subscribe to.
+// validEvents is the set of static event names clients are allowed to
+// subscribe to.
 var validEvents = map[string]bool{
 	"notification.created": true,
 	"timer.created":        true,
@@ -269,6 +273,28 @@ var validEvents = map[string]bool{
 	"timer.deleted":        true,
 }
 
+// channelEventPrefix is the prefix of parameterized subscription channels.
+// project.<id>.tasks carries task lifecycle events scoped to one project.
+const channelEventPrefix = "project."
+
 func isValidEvent(event string) bool {
-	return validEvents[event]
+	if validEvents[event] {
+		return true
+	}
+	after, ok := strings.CutPrefix(event, channelEventPrefix)
+	if !ok {
+		return false
+	}
+	id, ch, ok2 := strings.Cut(after, ".")
+	if !ok2 || ch != "tasks" {
+		return false
+	}
+	parsed, err := strconv.ParseInt(id, 10, 64)
+	return err == nil && parsed > 0
+}
+
+// ProjectChannel returns the subscription channel name for task events of a
+// project.
+func ProjectChannel(projectID int64) string {
+	return fmt.Sprintf("project.%d.tasks", projectID)
 }
