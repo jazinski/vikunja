@@ -92,7 +92,11 @@ func GetAvatarForUsername(s *xorm.Session, username string, size int64) (data []
 		provider = &empty.Provider{}
 	}
 	if found && u.IsBot() {
-		provider = &botmarble.Provider{}
+		// PATCH (jazinski): a bot with an uploaded avatar uses it; only bots
+		// without one fall back to the botmarble provider.
+		if u.AvatarProvider != "upload" {
+			provider = &botmarble.Provider{}
+		}
 	}
 
 	if size > config.ServiceMaxAvatarSize.GetInt64() {
