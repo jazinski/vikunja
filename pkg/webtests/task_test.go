@@ -190,10 +190,15 @@ func TestTask(t *testing.T) {
 				assert.NotContains(t, rec.Body.String(), `"assignees":[{"id":1`)
 			})
 			t.Run("Removing Assignees null", func(t *testing.T) {
+				// Fork divergence from upstream (#42 on the casa board):
+				// upstream treated an absent/null assignees field as
+				// "clear all", which silently unassigned everyone on any
+				// partial task update. On this fork, absent/null keeps
+				// the assignees; only an explicit empty array clears.
 				rec, err := testHandler.testUpdateWithUser(nil, map[string]string{"projecttask": "30"}, `{"assignees":null}`)
 				require.NoError(t, err)
-				assert.Contains(t, rec.Body.String(), `"assignees":null`)
-				assert.NotContains(t, rec.Body.String(), `"assignees":[{"id":1`)
+				assert.Contains(t, rec.Body.String(), `"assignees":[{"id":1`)
+				assert.Contains(t, rec.Body.String(), `"assignees":[{"id":2`)
 			})
 			t.Run("Priority", func(t *testing.T) {
 				rec, err := testHandler.testUpdateWithUser(nil, map[string]string{"projecttask": "1"}, `{"priority":100}`)
