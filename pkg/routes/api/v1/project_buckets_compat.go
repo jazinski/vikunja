@@ -25,7 +25,7 @@ import (
 	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/auth"
 
-	"github.com/labstack/echo/v4"
+	echo "github.com/labstack/echo/v5"
 )
 
 // GetProjectBuckets is a compatibility alias for the pre-view kanban API.
@@ -63,7 +63,6 @@ func GetProjectBuckets(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not determine the current user.").Wrap(err)
 	}
-
 	buckets, err := models.GetKanbanBucketsForProject(s, projectID, currentAuth)
 	if err != nil {
 		return handlerError(err)
