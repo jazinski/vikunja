@@ -256,8 +256,14 @@ func TestCanDoAPIRoute_BucketCompatAliasAuthorisedByViewsBuckets(t *testing.T) {
 	CollectRoutesForAPITokenUsage(echo.RouteInfo{Method: "GET", Path: "/api/v1/projects/:project/views/:view/buckets"}, true)
 	CollectRoutesForAPITokenUsage(echo.RouteInfo{Method: "GET", Path: "/api/v1/projects/:project/buckets"}, true)
 
+	// The views-scoped list files under projects.views_buckets; the alias
+	// files under its own projects_buckets CRUD group. The token only
+	// carries the former — the alias must still be authorised.
+	require.Contains(t, apiTokenRoutes, "projects")
+	require.Contains(t, apiTokenRoutes["projects"], "views_buckets")
+
 	token := &APIToken{APIPermissions: APIPermissions{"projects": []string{"views_buckets"}}}
-	req := httptest.NewRequest("GET", "/api/v1/projects/1/buckets", nil)
+	req := httptest.NewRequest("GET", "/api/v1/projects/:project/buckets", nil)
 	c := echo.New().NewContext(req, httptest.NewRecorder())
 	assert.True(t, CanDoAPIRoute(c, token),
 		"projects.views_buckets must authorise the bucket compat alias")
