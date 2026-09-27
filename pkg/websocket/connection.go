@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"code.vikunja.io/api/pkg/log"
+	"code.vikunja.io/api/pkg/models"
 	"code.vikunja.io/api/pkg/modules/auth"
 
 	"github.com/coder/websocket"
@@ -168,13 +169,33 @@ func (c *Connection) handleMessage(ctx context.Context, msg IncomingMessage) boo
 	return true
 }
 
+// resolveAuthToken accepts either a session JWT or an API token (tk_…)
+// and returns the authenticated user's ID. API tokens go through the same
+// ValidateAPITokenString lookup the REST middleware uses (expiry and owner
+// account status included); a token that isn't valid for either kind is
+// rejected.
+func resolveAuthToken(token string) (int64, error) {
+	userID, jwtErr := auth.GetUserIDFromToken(token)
+	if jwtErr == nil {
+		return userID, nil
+	}
+	if strings.HasPrefix(token, models.APITokenPrefix) {
+		_, u, err := auth.ValidateAPITokenString(token)
+		if err != nil {
+			return 0, err
+		}
+		return u.ID, nil
+	}
+	return 0, jwtErr
+}
+
 func (c *Connection) handleAuth(ctx context.Context, token string) bool {
 	if c.IsAuthenticated() {
 		c.sendError("already_authenticated", "")
 		return true
 	}
 
-	userID, err := auth.GetUserIDFromToken(token)
+	userID, err := resolveAuthToken(token)
 	if err != nil {
 		log.Debugf("WebSocket: auth failed: %v", err)
 		// Write the error directly to the websocket since ReadLoop will close the
