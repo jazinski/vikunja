@@ -545,6 +545,10 @@ func (err *ErrCannotArchiveDefaultProject) HTTPError() web.HTTPError {
 // ErrProjectViewDoesNotExist represents an error where the default project is being deleted
 type ErrProjectViewDoesNotExist struct {
 	ProjectViewID int64
+	// ProjectID is set when the error was raised while resolving a
+	// project's kanban view, so callers can tell "no kanban view in
+	// this project" apart from a bogus view id.
+	ProjectID int64
 }
 
 // IsErrProjectViewDoesNotExist checks if an error is a project is archived error.

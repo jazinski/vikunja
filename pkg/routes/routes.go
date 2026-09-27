@@ -692,6 +692,9 @@ func registerAPIRoutes(a *echo.Group, noAuthRateLimit, refreshRateLimit echo.Mid
 	a.PUT("/projects/:project/views/:view/buckets", kanbanBucketHandler.CreateWeb)
 	a.POST("/projects/:project/views/:view/buckets/:bucket", kanbanBucketHandler.UpdateWeb)
 	a.DELETE("/projects/:project/views/:view/buckets/:bucket", kanbanBucketHandler.DeleteWeb)
+	// Compat alias for the pre-views v1 API: resolves the project's kanban
+	// view at runtime and returns its buckets. See #37 / #42.
+	a.GET("/projects/:project/buckets", apiv1.GetProjectBuckets)
 
 	projectDuplicateHandler := &handler.WebHandler{
 		EmptyStruct: func() handler.CObject {
