@@ -50,7 +50,7 @@ import (
 // @Failure 404 {object} models.Message "The project has no kanban view"
 // @Failure 500 {object} models.Message "Internal error"
 // @Router /projects/{project}/buckets [get]
-func GetProjectBuckets(c echo.Context) error {
+func GetProjectBuckets(c *echo.Context) error {
 	projectID, err := strconv.ParseInt(c.Param("project"), 10, 64)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid project id.")
@@ -59,7 +59,7 @@ func GetProjectBuckets(c echo.Context) error {
 	s := db.NewSession()
 	defer s.Close()
 
-	currentAuth, err := auth.GetAuthFromClaims(&c)
+	currentAuth, err := auth.GetAuthFromClaims(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Could not determine the current user.").Wrap(err)
 	}
