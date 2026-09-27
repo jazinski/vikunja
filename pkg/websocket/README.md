@@ -45,7 +45,10 @@ rejected with `{"error": "auth_required"}`.
 
 Task and comment events are only delivered to connections whose authenticated
 user can read the task's project at delivery time; access is re-checked per
-event, not at subscribe time.
+event, not at subscribe time. For `task.created`, `task.updated` and all
+comment events the check resolves the task fresh from the database. For
+`task.deleted` the task row is already soft-deleted when the event arrives, so
+access is scoped by the task's project directly.
 
 Comment events carry mention metadata so clients can render mentions without
 an extra API round-trip. `mentions` is a list of `{id, username, name}`

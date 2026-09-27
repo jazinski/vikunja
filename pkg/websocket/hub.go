@@ -80,11 +80,7 @@ func (h *Hub) PublishForUser(userID int64, event string, data any) {
 		if !conn.IsSubscribed(event) {
 			continue
 		}
-		select {
-		case conn.send <- msg:
-		default:
-			log.Warningf("WebSocket: send buffer full for user %d, dropping message", userID)
-		}
+		conn.trySend(msg)
 	}
 }
 
@@ -97,12 +93,13 @@ func (h *Hub) PublishTaskEvent(s *xorm.Session, event string, task *models.Task)
 	conns := h.allConnections()
 	h.mu.RUnlock()
 
+	access := newTaskAccess(s, task)
 	msg := OutgoingMessage{Event: event, Data: task}
 	for _, conn := range conns {
 		if !conn.IsSubscribed(event) {
 			continue
 		}
-		if !h.canReadTask(s, conn.UserID(), task) {
+		if !access.canRead(conn.UserID()) {
 			continue
 		}
 		conn.trySend(msg)
@@ -116,12 +113,13 @@ func (h *Hub) PublishCommentEvent(s *xorm.Session, event string, task *models.Ta
 	conns := h.allConnections()
 	h.mu.RUnlock()
 
+	access := newTaskAccess(s, task)
 	msg := OutgoingMessage{Event: event, Data: payload}
 	for _, conn := range conns {
 		if !conn.IsSubscribed(event) {
 			continue
 		}
-		if !h.canReadTask(s, conn.UserID(), task) {
+		if !access.canRead(conn.UserID()) {
 			continue
 		}
 		conn.trySend(msg)
@@ -137,17 +135,55 @@ func (h *Hub) allConnections() []*Connection {
 	return conns
 }
 
-func (h *Hub) canReadTask(s *xorm.Session, userID int64, task *models.Task) bool {
+// taskAccess decides, for one fan-out, which users may receive an event about
+// a task. It is short-lived: one instance per Publish* call, never shared
+// between events, so its memo needs no locking.
+type taskAccess struct {
+	s     *xorm.Session
+	task  *models.Task
+	cache map[int64]bool
+}
+
+func newTaskAccess(s *xorm.Session, task *models.Task) *taskAccess {
+	return &taskAccess{s: s, task: task, cache: make(map[int64]bool)}
+}
+
+// canRead reports whether the user may read the task, memoized per fan-out so
+// N connections of the same user (or users resolving through the same project
+// ACL) do not turn into N database roundtrips.
+func (a *taskAccess) canRead(userID int64) bool {
+	if allowed, ok := a.cache[userID]; ok {
+		return allowed
+	}
+	allowed := a.check(userID)
+	a.cache[userID] = allowed
+	return allowed
+}
+
+func (a *taskAccess) check(userID int64) bool {
 	// A fresh minimal task keeps the check honest: resolving from the event
 	// payload would trust the task's own ProjectID, which every producer
 	// sets correctly, but a copy costs little and guards against listeners
 	// wired to events whose payload is user-controlled.
-	canRead, _, err := (&models.Task{ID: task.ID}).CanRead(s, &user.User{ID: userID})
-	if err != nil {
-		log.Errorf("WebSocket: access check for task %d failed: %v", task.ID, err)
+	canRead, _, err := (&models.Task{ID: a.task.ID}).CanRead(a.s, &user.User{ID: userID})
+	switch {
+	case err == nil:
+		return canRead
+	case models.IsErrTaskDoesNotExist(err):
+		// task.deleted arrives after the soft delete: the row is invisible
+		// to the refetch above, so scope by the event's project instead.
+		// The event was dispatched server-side about a task that existed,
+		// which is proof enough the ProjectID is genuine.
+		canRead, _, err := (&models.Project{ID: a.task.ProjectID}).CanRead(a.s, &user.User{ID: userID})
+		if err != nil {
+			log.Errorf("WebSocket: access check for deleted task %d via project %d failed: %v", a.task.ID, a.task.ProjectID, err)
+			return false
+		}
+		return canRead
+	default:
+		log.Errorf("WebSocket: access check for task %d failed: %v", a.task.ID, err)
 		return false
 	}
-	return canRead
 }
 
 // trySend enqueues msg without ever blocking: a slow consumer must not hold

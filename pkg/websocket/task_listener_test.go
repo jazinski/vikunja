@@ -20,6 +20,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"code.vikunja.io/api/pkg/db"
 	"code.vikunja.io/api/pkg/events"
@@ -195,6 +196,32 @@ func TestTaskEventListenerFanOut(t *testing.T) {
 		)
 
 		assert.Empty(t, conn.send)
+	})
+
+	t.Run("pushes task.deleted to users with project access", func(t *testing.T) {
+		InitHub()
+		// user1 has a direct share on project 3; user7 does not.
+		conn1 := taskConn(1, "task.deleted")
+		conn7 := taskConn(7, "task.deleted")
+		GetHub().Register(conn1)
+		GetHub().Register(conn7)
+
+		s := setupTaskListenerTest(t)
+		// Mirror production: TaskDeletedEvent is dispatched after the task
+		// row is soft-deleted, so the row must be gone when the listener
+		// re-checks access — otherwise this tests nothing about #1.
+		_, err := s.Exec("UPDATE tasks SET deleted_at = ? WHERE id = 32", time.Now())
+		require.NoError(t, err)
+		require.NoError(t, s.Commit())
+		events.TestListener(t,
+			&models.TaskDeletedEvent{Task: &models.Task{ID: 32, ProjectID: 3}},
+			&TaskEventListener{wsEvent: "task.deleted"},
+		)
+
+		require.Len(t, conn1.send, 1, "user1 must receive the delete event")
+		msg := <-conn1.send
+		assert.Equal(t, "task.deleted", msg.Event)
+		assert.Empty(t, conn7.send, "user7 (no access) must not receive the delete event")
 	})
 }
 
