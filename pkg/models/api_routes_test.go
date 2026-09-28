@@ -245,6 +245,30 @@ func TestCanDoAPIRoute_TimeEntriesHyphenLegacy(t *testing.T) {
 	}
 }
 
+// TestCanDoAPIRoute_BucketCompatAliasAuthorisedByViewsBuckets proves the v1
+// bucket compat alias (/projects/:project/buckets) is authorised by the
+// projects.views_buckets permission every pre-alias token already carries.
+// Without this, every bot would have to mint a new token just to keep
+// enumerating buckets — defeating the point of a compat alias.
+func TestCanDoAPIRoute_BucketCompatAliasAuthorisedByViewsBuckets(t *testing.T) {
+	resetAPITokenRoutes(t)
+
+	CollectRoutesForAPITokenUsage(echo.RouteInfo{Method: "GET", Path: "/api/v1/projects/:project/views/:view/buckets"}, true)
+	CollectRoutesForAPITokenUsage(echo.RouteInfo{Method: "GET", Path: "/api/v1/projects/:project/buckets"}, true)
+
+	// The views-scoped list files under projects.views_buckets; the alias
+	// files under its own projects_buckets CRUD group. The token only
+	// carries the former — the alias must still be authorised.
+	require.Contains(t, apiTokenRoutes, "projects")
+	require.Contains(t, apiTokenRoutes["projects"], "views_buckets")
+
+	token := &APIToken{APIPermissions: APIPermissions{"projects": []string{"views_buckets"}}}
+	req := httptest.NewRequest("GET", "/api/v1/projects/:project/buckets", nil)
+	c := echo.New().NewContext(req, httptest.NewRecorder())
+	assert.True(t, CanDoAPIRoute(c, token),
+		"projects.views_buckets must authorise the bucket compat alias")
+}
+
 // TestGetRouteDetail_V2Verbs verifies the v2 verb mapping: POST→create,
 // PUT/PATCH→update. v1 inverts POST and PUT so we need a separate mapping
 // path.

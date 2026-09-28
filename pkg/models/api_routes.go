@@ -499,6 +499,17 @@ func tokenAuthorizesRoute(token *APIToken, path, method string) bool {
 						path == "/api/v2/tasks" || path == "/api/v2/projects/:project/tasks") {
 					return true
 				}
+				// The v1 bucket compat alias (/projects/:project/buckets)
+				// serves the same data as the views-scoped bucket list.
+				// Tokens minted before the alias existed only carry
+				// projects.views_buckets; accepting that permission for
+				// the alias keeps every existing bot working without
+				// re-minting tokens. Same quirk shape as tasks.read_all.
+				if method == http.MethodGet && path == "/api/v1/projects/:project/buckets" &&
+					group == "projects" && p == "views_buckets" &&
+					rd.Method == http.MethodGet && rd.Path == "/api/v1/projects/:project/views/:view/buckets" {
+					return true
+				}
 			}
 		}
 	}

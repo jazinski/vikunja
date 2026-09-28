@@ -343,3 +343,68 @@ func TestBucket_CanUpdate(t *testing.T) {
 		assert.True(t, can)
 	})
 }
+
+func TestGetDefaultBucketID_NeverPicksDoneBucket(t *testing.T) {
+	t.Run("explicit default bucket wins", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		// View 4 has default_bucket_id: 1 in the fixtures.
+		view, err := GetProjectViewByIDAndProject(s, 4, 1)
+		require.NoError(t, err)
+		id, err := getDefaultBucketID(s, view)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), id)
+	})
+	t.Run("fallback skips the done bucket when it is leftmost", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		// Build the exact board shape that bit the casa deployment: the
+		// done bucket has the lowest position of all buckets and the view
+		// has no explicit default bucket. New tasks must not land in Done.
+		view, err := GetProjectViewByIDAndProject(s, 4, 1)
+		require.NoError(t, err)
+		_, err = s.Where("id = ?", view.ID).
+			Cols("default_bucket_id").Update(&ProjectView{DefaultBucketID: 0})
+		require.NoError(t, err)
+		_, err = s.Where("id = ?", 3).Cols("position").Update(&Bucket{Position: -100})
+		require.NoError(t, err)
+
+		id, err := getDefaultBucketID(s, view)
+		require.NoError(t, err)
+		assert.NotEqual(t, int64(3), id, "the done bucket must never be the default fallback")
+		assert.NotEqual(t, int64(0), id, "a usable fallback bucket must be found")
+	})
+}
+
+func TestGetKanbanBucketsForProject(t *testing.T) {
+	t.Run("resolves view and done flag at runtime", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		buckets, err := GetKanbanBucketsForProject(s, 1, &user.User{ID: 1})
+		require.NoError(t, err)
+		require.NotEmpty(t, buckets)
+
+		var doneSeen int
+		for _, b := range buckets {
+			if b.IsDoneBucket {
+				doneSeen++
+				assert.Equal(t, int64(3), b.ID, "view 4's done bucket is 3")
+			}
+		}
+		assert.Equal(t, 1, doneSeen, "exactly one done bucket must be flagged")
+	})
+	t.Run("no access", func(t *testing.T) {
+		db.LoadAndAssertFixtures(t)
+		s := db.NewSession()
+		defer s.Close()
+
+		_, err := GetKanbanBucketsForProject(s, 1, &user.User{ID: 2})
+		require.Error(t, err)
+	})
+}

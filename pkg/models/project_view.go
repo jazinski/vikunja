@@ -200,6 +200,63 @@ func getViewsForProject(s *xorm.Session, projectID int64) (views []*ProjectView,
 	return
 }
 
+// GetKanbanViewForProject resolves the project's kanban view at runtime.
+// It prefers a manually-configured kanban view (the only kind that has
+// buckets) and falls back to any kanban view. API clients that only know
+// a project id need this to enumerate buckets — view and bucket ids are
+// per-project and must never be hardcoded.
+func GetKanbanViewForProject(s *xorm.Session, projectID int64) (view *ProjectView, err error) {
+	views, err := getViewsForProject(s, projectID)
+	if err != nil {
+		return nil, err
+	}
+	var fallback *ProjectView
+	for _, v := range views {
+		if v.ViewKind != ProjectViewKindKanban {
+			continue
+		}
+		if v.BucketConfigurationMode == BucketConfigurationModeManual {
+			return v, nil
+		}
+		fallback = v
+	}
+	if fallback != nil {
+		return fallback, nil
+	}
+	return nil, &ErrProjectViewDoesNotExist{ProjectID: projectID}
+}
+
+// GetKanbanBucketsForProject returns all buckets of the project's kanban
+// view with IsDoneBucket set from the view's done_bucket_id. This backs
+// the /projects/{id}/buckets compat alias so automation can resolve the
+// Backlog/Doing/Done columns by title without a second round-trip.
+func GetKanbanBucketsForProject(s *xorm.Session, projectID int64, a web.Auth) (buckets []*Bucket, err error) {
+	view, err := GetKanbanViewForProject(s, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Permission check through the view, same as the bucket ReadAll.
+	can, _, err := view.CanRead(s, a)
+	if err != nil {
+		return nil, err
+	}
+	if !can {
+		return nil, ErrGenericForbidden{}
+	}
+
+	b := &Bucket{ProjectID: projectID, ProjectViewID: view.ID}
+	result, _, _, err := b.ReadAll(s, a, "", 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	buckets, _ = result.([]*Bucket)
+	for _, bb := range buckets {
+		bb.IsDoneBucket = bb.ID == view.DoneBucketID
+	}
+	return buckets, nil
+}
+
 // ReadAll gets all project views
 // @Summary Get all project views for a project
 // @Description Returns all project views for a sepcific project

@@ -46,6 +46,11 @@ type Bucket struct {
 	// The number of tasks currently in this bucket
 	Count int64 `xorm:"-" json:"count"`
 
+	// Whether this bucket is the done bucket of its view: tasks moved
+	// here are marked done, and tasks marked done are moved here.
+	// Derived from the view's done_bucket_id at read time.
+	IsDoneBucket bool `xorm:"-" json:"is_done_bucket" readOnly:"true" doc:"Whether this is the view's done bucket."`
+
 	// The position this bucket has when querying all buckets. See the tasks.position property on how to use this.
 	Position float64 `xorm:"double null" json:"position"`
 
@@ -87,16 +92,29 @@ func getDefaultBucketID(s *xorm.Session, view *ProjectView) (bucketID int64, err
 		return view.DefaultBucketID, nil
 	}
 
-	bucket := &Bucket{}
-	_, err = s.
+	// Fall back to the leftmost bucket, but never the done bucket: a board
+	// whose done column happens to be leftmost would otherwise silently
+	// auto-complete every newly created task.
+	buckets := []*Bucket{}
+	err = s.
 		Where("project_view_id = ?", view.ID).
 		OrderBy("position asc, id asc").
-		Get(bucket)
+		Find(&buckets)
 	if err != nil {
 		return 0, err
 	}
+	for _, bucket := range buckets {
+		if view.DoneBucketID != 0 && bucket.ID == view.DoneBucketID {
+			continue
+		}
+		return bucket.ID, nil
+	}
+	if len(buckets) > 0 {
+		// Only the done bucket exists — better than nothing.
+		return buckets[0].ID, nil
+	}
 
-	return bucket.ID, nil
+	return 0, nil
 }
 
 // ReadAll returns all manual buckets for a certain project
@@ -150,6 +168,9 @@ func (b *Bucket) ReadAll(s *xorm.Session, auth web.Auth, _ string, _ int, _ int)
 		if createdBy, has := users[bb.CreatedByID]; has {
 			bb.CreatedBy = createdBy
 		}
+		// Expose which bucket is the done bucket so clients can resolve
+		// the Done column without an extra view round-trip.
+		bb.IsDoneBucket = view.DoneBucketID != 0 && bb.ID == view.DoneBucketID
 	}
 
 	return buckets, len(buckets), int64(len(buckets)), nil

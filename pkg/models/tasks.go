@@ -1310,10 +1310,26 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 	// Old task has the stored reminders
 	ot.Reminders = reminders
 
-	// Update the assignees
-	if err := ot.updateTaskAssignees(s, t.Assignees, a); err != nil {
-		return err
+	// Update the assignees. A nil list means the caller did not send any
+	// assignees at all (JSON null or absent) — that must NOT clear existing
+	// assignments, otherwise every partial task update (e.g. moving a card
+	// via a client that only sends bucket_id) silently unassigns everyone.
+	// Sending an explicit empty list still clears the assignees.
+	if t.Assignees != nil {
+		if err := ot.updateTaskAssignees(s, t.Assignees, a); err != nil {
+			return err
+		}
+	} else {
+		current, err := getRawTaskAssigneesForTasks(s, []int64{t.ID})
+		if err != nil {
+			return err
+		}
+		ot.Assignees = make([]*user.User, 0, len(current))
+		for i := range current {
+			ot.Assignees = append(ot.Assignees, &current[i].User)
+		}
 	}
+	t.Assignees = ot.Assignees
 
 	// All columns to update in a separate variable to be able to add to them
 	colsToUpdate := []string{
@@ -1426,6 +1442,42 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 		}
 		t.BucketID = 0
 		colsToUpdate = append(colsToUpdate, "index")
+	}
+
+	// A bucket change sent through the generic task update endpoint must be
+	// routed through the kanban move machinery: the tasks table no longer
+	// has a bucket_id column (membership lives in the task_buckets join
+	// table), so writing it as a column silently persisted nothing. Routing
+	// it through updateTaskBucket also gives the move the same semantics as
+	// a drag & drop in the UI, including flipping done when entering or
+	// leaving the view's done bucket.
+	// A BucketID of 0 means the client did not send one — leave the
+	// membership untouched.
+	if t.ProjectID == ot.ProjectID && t.BucketID != 0 {
+		bucket, err := getBucketByID(s, t.BucketID)
+		if err != nil {
+			return err
+		}
+		view, err := GetProjectViewByIDAndProject(s, bucket.ProjectViewID, t.ProjectID)
+		if err != nil {
+			return err
+		}
+		tb := &TaskBucket{
+			BucketID:      t.BucketID,
+			TaskID:        t.ID,
+			ProjectViewID: view.ID,
+			ProjectID:     t.ProjectID,
+		}
+		if err := updateTaskBucket(s, a, tb); err != nil {
+			return err
+		}
+		if tb.Task != nil {
+			// Entering/leaving the done bucket may have changed the done
+			// state; keep the rest of this update consistent with it.
+			t.Done = tb.Task.Done
+			t.DoneAt = tb.Task.DoneAt
+		}
+		t.BucketID = 0
 	}
 
 	views := []*ProjectView{}
