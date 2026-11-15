@@ -363,6 +363,9 @@ func duplicateTasks(s *xorm.Session, doer web.Auth, ld *ProjectDuplicate) (newTa
 		t.ID = 0
 		t.ProjectID = ld.Project.ID
 		t.UID = ""
+		// Reads hydrate the original bucket membership; the copy must not
+		// carry it - duplicateViews remaps task_buckets to the new buckets.
+		t.BucketID = 0
 	}
 
 	err = createTasks(s, ld.Project.ID, tasks, doer, false, false, true)
