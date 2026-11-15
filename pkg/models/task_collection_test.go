@@ -101,6 +101,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	// We use individual variables for the tasks here to be able to rearrange or remove ones more easily
 	task1 := &Task{
 		ID:          1,
+		BucketID:    1,
 		Title:       "task #1",
 		Description: "Lorem Ipsum",
 		Identifier:  "TEST1-1",
@@ -175,6 +176,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task2 := &Task{
 		ID:          2,
+		BucketID:    3,
 		Title:       "task #2 done",
 		Identifier:  "TEST1-2",
 		Index:       2,
@@ -205,6 +207,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task3 := &Task{
 		ID:           3,
+		BucketID:     2,
 		Title:        "task #3 high prio",
 		Identifier:   "TEST1-3",
 		Index:        3,
@@ -218,6 +221,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task4 := &Task{
 		ID:           4,
+		BucketID:     2,
 		Title:        "task #4 low prio",
 		Identifier:   "TEST1-4",
 		Index:        4,
@@ -231,6 +235,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task5 := &Task{
 		ID:           5,
+		BucketID:     2,
 		Title:        "task #5 higher due date",
 		Identifier:   "TEST1-5",
 		Index:        5,
@@ -244,6 +249,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task6 := &Task{
 		ID:           6,
+		BucketID:     3,
 		Title:        "task #6 lower due date",
 		Description:  "This has something unique",
 		Identifier:   "TEST1-6",
@@ -258,6 +264,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task7 := &Task{
 		ID:           7,
+		BucketID:     3,
 		Title:        "task #7 with start date",
 		Identifier:   "TEST1-7",
 		Index:        7,
@@ -271,6 +278,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task8 := &Task{
 		ID:           8,
+		BucketID:     3,
 		Title:        "task #8 with end date",
 		Identifier:   "TEST1-8",
 		Index:        8,
@@ -284,6 +292,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task9 := &Task{
 		ID:           9,
+		BucketID:     1,
 		Title:        "task #9 with start and end date",
 		Identifier:   "TEST1-9",
 		Index:        9,
@@ -298,6 +307,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task10 := &Task{
 		ID:           10,
+		BucketID:     1,
 		Title:        "task #10 basic",
 		Identifier:   "TEST1-10",
 		Index:        10,
@@ -310,6 +320,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task11 := &Task{
 		ID:           11,
+		BucketID:     1,
 		Title:        "task #11 basic",
 		Identifier:   "TEST1-11",
 		Index:        11,
@@ -322,6 +333,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task12 := &Task{
 		ID:           12,
+		BucketID:     1,
 		Title:        "task #12 basic",
 		Identifier:   "TEST1-12",
 		Index:        12,
@@ -334,6 +346,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task15 := &Task{
 		ID:           15,
+		BucketID:     6,
 		Title:        "task #15",
 		Identifier:   "TEST6-1",
 		Index:        1,
@@ -347,6 +360,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task16 := &Task{
 		ID:           16,
+		BucketID:     7,
 		Title:        "task #16",
 		Identifier:   "TEST7-1",
 		Index:        1,
@@ -359,6 +373,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task17 := &Task{
 		ID:           17,
+		BucketID:     8,
 		Title:        "task #17",
 		Identifier:   "TEST8-1",
 		Index:        1,
@@ -371,6 +386,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task18 := &Task{
 		ID:           18,
+		BucketID:     9,
 		Title:        "task #18",
 		Identifier:   "TEST9-1",
 		Index:        1,
@@ -383,6 +399,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task19 := &Task{
 		ID:           19,
+		BucketID:     10,
 		Title:        "task #19",
 		Identifier:   "TEST10-1",
 		Index:        1,
@@ -395,6 +412,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task20 := &Task{
 		ID:           20,
+		BucketID:     11,
 		Title:        "task #20",
 		Identifier:   "TEST11-1",
 		Index:        1,
@@ -407,6 +425,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task21 := &Task{
 		ID:           21,
+		BucketID:     12,
 		Title:        "task #21",
 		Identifier:   "#1",
 		Index:        1,
@@ -419,6 +438,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task22 := &Task{
 		ID:           22,
+		BucketID:     36,
 		Title:        "task #22",
 		Identifier:   "#1",
 		Index:        1,
@@ -431,6 +451,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task23 := &Task{
 		ID:           23,
+		BucketID:     37,
 		Title:        "task #23",
 		Identifier:   "#1",
 		Index:        1,
@@ -443,6 +464,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task24 := &Task{
 		ID:           24,
+		BucketID:     15,
 		Title:        "task #24",
 		Identifier:   "TEST15-1",
 		Index:        1,
@@ -455,6 +477,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task25 := &Task{
 		ID:          25,
+		BucketID:    16,
 		Title:       "task #25",
 		Identifier:  "TEST16-1",
 		Index:       1,
@@ -470,6 +493,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task26 := &Task{
 		ID:           26,
+		BucketID:     17,
 		Title:        "task #26",
 		Identifier:   "TEST17-1",
 		Index:        1,
@@ -482,6 +506,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task27 := &Task{
 		ID:          27,
+		BucketID:    1,
 		Title:       "task #27 with reminders and start_date",
 		Identifier:  "TEST1-18",
 		Index:       18,
@@ -511,6 +536,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task28 := &Task{
 		ID:           28,
+		BucketID:     1,
 		Title:        "task #28 with repeat after, start_date, end_date and due_date",
 		Identifier:   "TEST1-13",
 		Index:        13,
@@ -527,6 +553,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task29 := &Task{
 		ID:          29,
+		BucketID:    1,
 		Title:       "task #29 with parent task (1)",
 		Identifier:  "TEST1-14",
 		Index:       14,
@@ -553,6 +580,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task30 := &Task{
 		ID:          30,
+		BucketID:    1,
 		Title:       "task #30 with assignees",
 		Identifier:  "TEST1-15",
 		Index:       15,
@@ -569,6 +597,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task31 := &Task{
 		ID:           31,
+		BucketID:     1,
 		Title:        "task #31 with color",
 		Identifier:   "TEST1-16",
 		Index:        16,
@@ -582,6 +611,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task32 := &Task{
 		ID:           32,
+		BucketID:     21,
 		Title:        "task #32",
 		Identifier:   "TEST3-1",
 		Index:        1,
@@ -594,6 +624,7 @@ func TestTaskCollection_ReadAll(t *testing.T) {
 	}
 	task33 := &Task{
 		ID:           33,
+		BucketID:     1,
 		Title:        "task #33 with percent done",
 		Identifier:   "TEST1-17",
 		Index:        17,

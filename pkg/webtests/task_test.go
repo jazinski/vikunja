@@ -198,7 +198,7 @@ func TestTask(t *testing.T) {
 				rec, err := testHandler.testUpdateWithUser(nil, map[string]string{"projecttask": "30"}, `{"assignees":null}`)
 				require.NoError(t, err)
 				assert.Contains(t, rec.Body.String(), `"assignees":[{"id":1`)
-				assert.Contains(t, rec.Body.String(), `"assignees":[{"id":2`)
+				assert.Contains(t, rec.Body.String(), `"username":"user2"`)
 			})
 			t.Run("Priority", func(t *testing.T) {
 				rec, err := testHandler.testUpdateWithUser(nil, map[string]string{"projecttask": "1"}, `{"priority":100}`)

@@ -145,4 +145,35 @@ func TestKanbanWritesRegression(t *testing.T) {
 		res := kanbanReq(e, http.MethodGet, "/api/v1/projects/1/buckets", userJWT(t, 2), "")
 		assert.Equal(t, http.StatusForbidden, res.Code)
 	})
+
+	t.Run("task read hydrates bucket_id from the join table", func(t *testing.T) {
+		e, err := setupTestEnv()
+		require.NoError(t, err)
+
+		// Task 1 is in bucket 1 (view 4) per the fixtures; a plain task
+		// read must say so instead of 0, or clients conclude their bucket
+		// writes never persisted.
+		res := kanbanReq(e, http.MethodGet, "/api/v1/tasks/1", userJWT(t, 1), "")
+		require.Equal(t, http.StatusOK, res.Code)
+		assert.Contains(t, res.Body.String(), `"bucket_id":1`)
+	})
+
+	t.Run("generic task update response reports the moved-to bucket", func(t *testing.T) {
+		e, err := setupTestEnv()
+		require.NoError(t, err)
+
+		res := kanbanReq(e, http.MethodPost, "/api/v1/tasks/1", userJWT(t, 1), `{"bucket_id":3}`)
+		require.Equal(t, http.StatusOK, res.Code)
+		assert.Contains(t, res.Body.String(), `"bucket_id":3`)
+	})
+
+	t.Run("project task list hydrates bucket_id", func(t *testing.T) {
+		e, err := setupTestEnv()
+		require.NoError(t, err)
+
+		// Tasks 3, 4 and 5 live in bucket 2 of view 4 per the fixtures.
+		res := kanbanReq(e, http.MethodGet, "/api/v1/projects/1/tasks", userJWT(t, 1), "")
+		require.Equal(t, http.StatusOK, res.Code)
+		assert.Contains(t, res.Body.String(), `"bucket_id":2`)
+	})
 }
