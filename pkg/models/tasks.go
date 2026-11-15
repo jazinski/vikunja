@@ -146,9 +146,10 @@ type Task struct {
 	// omitzero keeps the field out of the JSON of regular tasks — it only ever appears on soft-deleted ones (the later trash listing).
 	DeletedAt time.Time `xorm:"deleted datetime null INDEX 'deleted_at'" json:"deleted_at,omitzero" readOnly:"true" doc:"When this task was soft-deleted. Soft-deleted tasks are kept for 30 days before they are removed permanently."`
 
-	// The bucket id. Will only be populated when the task is accessed via a view with buckets.
-	// Can be used to move a task between buckets. In that case, the new bucket must be in the same view as the old one.
-	BucketID int64 `xorm:"-" json:"bucket_id" doc:"The bucket the task is in. Only populated when the task is accessed via a view with buckets. To move a task between buckets, the new bucket must be in the same view as the old one."`
+	// The bucket the task is currently in, resolved from the task_buckets join table.
+	// 0 means the task has no bucket membership. Can be used to move a task between
+	// buckets. In that case, the new bucket must be in the same view as the old one.
+	BucketID int64 `xorm:"-" json:"bucket_id" doc:"The bucket the task is in, resolved from its bucket memberships. When reading through a view, the bucket in that view. To move a task between buckets, the new bucket must be in the same view as the old one."`
 
 	// All buckets across all views this task is part of. Only present when fetching tasks with the `expand` parameter set to `buckets`.
 	Buckets []*Bucket `xorm:"-" json:"buckets,omitempty" readOnly:"true" doc:"The task's buckets across all views. Only present when requested via the buckets expand option."`
@@ -702,6 +703,41 @@ func addBucketsToTasks(s *xorm.Session, a web.Auth, taskIDs []int64, taskMap map
 	return nil
 }
 
+// addBucketIDsToTasks resolves each task's bucket membership from the
+// task_buckets join table into BucketID so serialized tasks report where
+// they actually live. The views storage refactor moved membership out of
+// the tasks table, and without this every task read reported bucket_id 0 —
+// a client doing a write-then-read cycle concluded its move never
+// persisted even though the row was written (#42).
+//
+// A task has at most one membership row (the invariant the move endpoints
+// maintain), so no view scoping happens here: reads through a list or
+// gantt view report the same bucket the kanban view shows. Values already
+// set (the kanban view sets them while grouping tasks into buckets) are
+// never overwritten, and tasks without a membership row keep 0.
+func addBucketIDsToTasks(s *xorm.Session, taskIDs []int64, taskMap map[int64]*Task) (err error) {
+	if len(taskIDs) == 0 {
+		return nil
+	}
+
+	tbs := []*TaskBucket{}
+	err = s.
+		In("task_id", taskIDs).
+		OrderBy("project_view_id asc, bucket_id asc").
+		Find(&tbs)
+	if err != nil {
+		return err
+	}
+
+	for _, tb := range tbs {
+		if t, exists := taskMap[tb.TaskID]; exists && t.BucketID == 0 {
+			t.BucketID = tb.BucketID
+		}
+	}
+
+	return nil
+}
+
 // This function takes a map with pointers and returns a slice with pointers to tasks
 // It adds more stuff like assignees/labels/etc to a bunch of tasks
 //
@@ -726,6 +762,11 @@ func addMoreInfoToTasks(s *xorm.Session, taskMap map[int64]*Task, a web.Auth, vi
 	}
 
 	err = addAssigneesToTasks(s, taskIDs, taskMap)
+	if err != nil {
+		return
+	}
+
+	err = addBucketIDsToTasks(s, taskIDs, taskMap)
 	if err != nil {
 		return
 	}
@@ -1718,6 +1759,14 @@ func (t *Task) updateSingleTask(s *xorm.Session, a web.Auth, fields []string) (e
 	}
 	t.Updated = nt.Updated
 
+	// Resolve the task's actual bucket membership so both the response and
+	// the task.updated event report where the task lives. The write paths
+	// deliberately zero BucketID (it is not a column anymore) and clients
+	// treat bucket_id 0 as "the move did not persist". See #42.
+	if err := addBucketIDsToTasks(s, []int64{t.ID}, map[int64]*Task{t.ID: t}); err != nil {
+		return err
+	}
+
 	events.DispatchOnCommit(s, &TaskUpdatedEvent{
 		Task: t,
 		Doer: doerFromAuth(s, a),
@@ -2410,6 +2459,9 @@ func (t *Task) ReadOne(s *xorm.Session, a web.Auth) (err error) {
 func triggerTaskUpdatedEventForTaskID(s *xorm.Session, auth web.Auth, taskID int64) error {
 	t, err := GetTaskByIDSimple(s, taskID)
 	if err != nil {
+		return err
+	}
+	if err := addBucketIDsToTasks(s, []int64{t.ID}, map[int64]*Task{t.ID: &t}); err != nil {
 		return err
 	}
 
